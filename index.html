@@ -243,9 +243,24 @@ input[type=text]::placeholder{color:var(--muted)}
 .result-court-main svg{position:absolute;inset:0;width:100%;height:100%}
 .rp-slot{position:absolute;transform:translate(-50%,-50%);width:17.5%}
 .rp-slot img{width:100%;aspect-ratio:0.78;object-fit:cover;border-radius:7px;display:block;box-shadow:0 3px 10px rgba(0,0,0,0.45)}
-.result-bench-row{flex-shrink:0;display:flex;gap:6px;padding:8px 10px;background:rgba(8,9,12,0.5);border-top:1px solid rgba(255,255,255,0.08);flex-wrap:wrap;justify-content:center}
-.result-bench-row img{width:13%;aspect-ratio:0.78;object-fit:cover;border-radius:5px;display:block;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
-.result-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:1rem}
+.result-bench-row {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(8, 9, 12, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  justify-items: center;
+}
+.result-bench-row img {
+  width: 100%;
+  aspect-ratio: 0.78;
+  object-fit: cover;
+  border-radius: 5px;
+  display: block;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}.result-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:1rem}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:rgba(0,0,0,0.2)}
 ::-webkit-scrollbar-thumb{background:var(--gold);border-radius:3px;opacity:0.5}
@@ -1203,14 +1218,14 @@ function openSlot(kind, idx){
         eraOk(p) &&
         !G.usedNames.has(p.name) &&
         !offeredElsewhere.has(p.name)
-      )).slice(0,5);
+      )).slice(0,4);
     } else {
       pool = shuffle(PLAYERS.filter(p=>
         eraOk(p) &&
         p.rating < 105 &&
         !G.usedNames.has(p.name) &&
         !offeredElsewhere.has(p.name)
-      )).slice(0,5);
+      )).slice(0,4);
     }
     G.lockedChoices[key] = pool;
     renderCards(pool);
