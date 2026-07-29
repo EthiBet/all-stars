@@ -24,7 +24,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 
 /* SCREENS */
 .screen{display:none;position:fixed;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.screen.active{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:2.5rem 1rem 4rem;padding-top:max(2.5rem,7vh)}
+.screen.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Center content vertically */
+  min-height: 100vh;
+  padding: 2.5rem 1rem 4rem;
+}
 #draftScreen{overflow:hidden}
 #draftScreen.active{justify-content:flex-start;padding:0;display:flex;flex-direction:column;height:100vh}
 
@@ -79,12 +86,44 @@ input[type=text]::placeholder{color:var(--muted)}
   content:'';position:fixed;inset:0;z-index:-1;
   background:radial-gradient(ellipse 70% 65% at 50% 48%, rgba(8,9,12,0.92) 0%, rgba(8,9,12,0.78) 35%, rgba(8,9,12,0.45) 65%, rgba(8,9,12,0.1) 100%);
 }
-#homeScreen::before{
-  background-image:url("images/basketballbackground.jpg");
-  background-size:cover;background-position:center;opacity:0.55;
+#homeScreen::before,
+#lobbyScreen::before,
+#joinScreen::before {
+  background-image: url("images/basketballbackground.jpg");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.55;
 }
-#homeScreen::after{
-  background:radial-gradient(ellipse 70% 65% at 50% 48%, rgba(8,9,12,0.88) 0%, rgba(8,9,12,0.72) 40%, rgba(232,184,75,0.08) 75%, rgba(8,9,12,0.2) 100%);
+
+#homeScreen::after,
+#lobbyScreen::after,
+#joinScreen::after {
+  background: radial-gradient(ellipse 70% 65% at 50% 48%, rgba(8,9,12,0.88) 0%, rgba(8,9,12,0.72) 40%, rgba(232,184,75,0.08) 75%, rgba(8,9,12,0.2) 100%);
+}
+/* Center all active screens vertically & horizontally */
+.screen.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Make sure joinScreen uses transparent background so image shows through */
+#joinScreen {
+  background: transparent;
+  width: 100%;
+}
+
+/* Ensure the join card container is neat and centered */
+#joinScreen > div {
+  max-width: 360px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 #draftScreen::before,#draftScreen::after{display:none}
 
@@ -108,7 +147,7 @@ input[type=text]::placeholder{color:var(--muted)}
 .mode-note b{color:var(--gold)}
 
 /* JOIN SCREEN */
-#joinScreen{background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(29,185,84,0.08) 0%,transparent 60%),var(--bg)}
+#joinScreen{background:transparent}
 .back-btn{position:absolute;top:1.2rem;left:1.2rem;background:transparent;border:1px solid var(--border2);border-radius:8px;padding:6px 12px;color:var(--muted2);font-size:0.8rem;cursor:pointer;font-family:'Barlow',sans-serif;transition:all 0.2s;letter-spacing:0.04em}
 .back-btn:hover{border-color:var(--muted2);color:var(--text)}
 .error-msg{font-size:0.8rem;color:var(--red);margin-top:0.4rem;min-height:1.2em}
@@ -379,15 +418,23 @@ input[type=text]::placeholder{color:var(--muted)}
 <!-- ░░░ JOIN SCREEN ░░░ -->
 <div id="joinScreen" class="screen">
   <button class="back-btn" onclick="leaveJoinScreen()">← Back</button>
-  <div class="logo-mark" style="width:44px;height:44px;margin-bottom:0.8rem"><img src="images/basketballlogo.png" alt="All-Stars"></div>
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.05em;color:var(--gold);margin-bottom:1.5rem">Join a Room</div>
-  <div class="input-wrap">
-    <label>Room Code</label>
-    <input type="text" id="joinCodeInput" placeholder="Enter 4-digit code..." maxlength="4" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+
+  <div style="display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 360px; width: 100%;">
+    <div class="logo-mark" style="width:44px;height:44px;margin-bottom:0.8rem">
+      <img src="images/basketballlogo.png" alt="All-Stars">
+    </div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.05em;color:var(--gold);margin-bottom:1.5rem">Join a Room</div>
+    
+    <div class="input-wrap">
+      <label>Room Code</label>
+      <input type="text" id="joinCodeInput" placeholder="Enter 4-digit code..." maxlength="4" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+    </div>
+    
+    <div class="mode-note" id="joinModeNote" style="display:none">Host is drafting from: <b id="joinModeNoteVal">—</b></div>
+    <div class="error-msg" id="joinError"></div>
+    
+    <button class="btn btn-green" id="joinBtn" onclick="joinRoom()" style="margin-top:0.4rem; width: 100%;" disabled>Join Room</button>
   </div>
-  <div class="mode-note" id="joinModeNote" style="display:none">Host is drafting from: <b id="joinModeNoteVal">—</b></div>
-  <button class="btn btn-green" id="joinBtn" onclick="joinRoom()" style="margin-top:0.4rem" disabled>Join Room</button>
-  <div class="error-msg" id="joinError"></div>
 </div>
 
 <!-- ░░░ DRAFT SCREEN ░░░ -->
