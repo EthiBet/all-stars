@@ -236,28 +236,53 @@ input[type=text]::placeholder{color:var(--muted)}
 .result-pitches{display:flex;gap:1.8rem;width:100%;max-width:1040px;margin-bottom:2rem;flex-wrap:wrap;justify-content:center}
 .result-pitch-block{flex:1;min-width:320px;max-width:480px}
 .rp-header{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:0.9rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);text-align:center;margin-bottom:10px}
-.result-pitch{position:relative;width:100%;aspect-ratio:0.86;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,#8a5a2b 0%,#96642f 8%,#8a5a2b 16%,#96642f 24%,#8a5a2b 32%,#96642f 40%,#8a5a2b 48%,#96642f 56%,#8a5a2b 64%,#96642f 72%,#8a5a2b 80%,#96642f 88%,#8a5a2b 96%,#96642f 100%);
-  border:1px solid var(--border2)}
-.result-court-main{position:relative;flex:1;min-height:0}
-.result-court-main svg{position:absolute;inset:0;width:100%;height:100%}
-.rp-slot{position:absolute;transform:translate(-50%,-50%);width:17.5%}
-.rp-slot img{width:100%;aspect-ratio:0.78;object-fit:cover;border-radius:7px;display:block;box-shadow:0 3px 10px rgba(0,0,0,0.45)}
+.result-pitch {
+  position: relative;
+  width: 100%;
+  /* Increase pitch height slightly to give court players room */
+  aspect-ratio: 0.72; 
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg,#8a5a2b 0%,#96642f 8%,#8a5a2b 16%,#96642f 24%,#8a5a2b 32%,#96642f 40%,#8a5a2b 48%,#96642f 56%,#8a5a2b 64%,#96642f 72%,#8a5a2b 80%,#96642f 88%,#8a5a2b 96%,#96642f 100%);
+  border: 1px solid var(--border2);
+}
+
+.result-court-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}.result-court-main svg{position:absolute;inset:0;width:100%;height:100%}
+.rp-slot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 21%; /* Increased from 17.5% so court players are larger */
+}
+.rp-slot img {
+  width: 100%;
+  aspect-ratio: 0.78;
+  object-fit: cover;
+  border-radius: 7px;
+  display: block;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+}
 .result-bench-row {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 8px 10px;
-  background: rgba(8, 9, 12, 0.5);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(8,9,12,0.65);
+  border-top: 1px solid rgba(255,255,255,0.08);
   justify-items: center;
 }
+
 .result-bench-row img {
   width: 100%;
   aspect-ratio: 0.78;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: 6px;
   display: block;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
