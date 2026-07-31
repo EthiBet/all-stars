@@ -206,9 +206,9 @@ input[type=text]::placeholder{color:var(--muted)}
 .court-lines svg{width:100%;height:100%}
 
 /* STARTER SLOTS (on court, bigger) */
-.starter-slot{position:absolute;transform:translate(-50%,-50%);width:84px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform 0.15s,width 0.15s;user-select:none}
+.starter-slot{position:absolute;transform:translate(-50%,-50%);width:100px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform 0.15s,width 0.15s;user-select:none}
 .starter-slot:hover{transform:translate(-50%,-50%) scale(1.07)}
-.starter-slot-img{width:100%;aspect-ratio:0.76;border-radius:10px;background:rgba(0,0,0,0.45);border:2.5px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;transition:border-color 0.2s,box-shadow 0.2s;backdrop-filter:blur(2px)}
+.starter-slot-img{width:100%;aspect-ratio:640/898;border-radius:10px;background:rgba(0,0,0,0.45);border:2.5px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;transition:border-color 0.2s,box-shadow 0.2s;backdrop-filter:blur(2px)}
 .starter-slot-img img{width:100%;height:100%;object-fit:cover;display:block;border-radius:8px}
 .starter-slot-img .pos-text{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.95rem;letter-spacing:0.08em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
 .starter-slot-label{font-family:'Barlow Condensed',sans-serif;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:rgba(255,255,255,0.92);background:rgba(0,0,0,0.6);border-radius:4px;padding:2px 8px}
@@ -217,21 +217,21 @@ input[type=text]::placeholder{color:var(--muted)}
 .starter-slot.filled .starter-slot-img{border:none;background:transparent;backdrop-filter:none;box-shadow:0 4px 12px rgba(0,0,0,0.45)}
 .starter-slot.active .starter-slot-img{border-color:var(--gold2);box-shadow:0 0 22px rgba(232,184,75,0.7);animation:none}
 @keyframes slotpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,184,75,0.5)}50%{box-shadow:0 0 0 6px rgba(232,184,75,0)}}
-@media(max-width:980px){.starter-slot{width:70px}.starter-slot-label{font-size:0.64rem;padding:2px 6px}}
-@media(max-width:700px){.starter-slot{width:clamp(52px,15vw,72px)}.starter-slot-label{font-size:0.6rem;padding:1px 5px}}
+@media(max-width:980px){.starter-slot{width:84px}.starter-slot-label{font-size:0.64rem;padding:2px 6px}}
+@media(max-width:700px){.starter-slot{width:clamp(60px,16vw,80px)}.starter-slot-label{font-size:0.6rem;padding:1px 5px}}
 
 /* BENCH SLOTS (smaller, no label) */
-.bench-slot{flex:0 0 auto;width:52px;cursor:pointer;transition:transform 0.15s;user-select:none}
+.bench-slot{flex:0 0 auto;width:64px;cursor:pointer;transition:transform 0.15s;user-select:none}
 .bench-slot:hover{transform:scale(1.08)}
-.bench-slot-img{width:52px;aspect-ratio:0.76;border-radius:8px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;transition:border-color 0.2s,box-shadow 0.2s}
+.bench-slot-img{width:64px;aspect-ratio:640/898;border-radius:8px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;transition:border-color 0.2s,box-shadow 0.2s}
 .bench-slot-img img{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px}
 .bench-slot-img .pos-text{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.3rem;color:rgba(255,255,255,0.28)}
 .bench-slot.available .bench-slot-img{border-color:var(--gold);animation:slotpulse 1.8s ease-in-out infinite}
 .bench-slot.available:hover .bench-slot-img{box-shadow:0 0 14px rgba(232,184,75,0.55);animation:none}
 .bench-slot.filled .bench-slot-img{border:none;background:transparent;box-shadow:0 3px 9px rgba(0,0,0,0.45)}
 .bench-slot.active .bench-slot-img{border-color:var(--gold2);box-shadow:0 0 18px rgba(232,184,75,0.7);animation:none}
-@media(max-width:980px){.bench-slot,.bench-slot-img{width:46px}}
-@media(max-width:700px){.bench-slot,.bench-slot-img{width:clamp(38px,10vw,50px)}}
+@media(max-width:980px){.bench-slot,.bench-slot-img{width:56px}}
+@media(max-width:700px){.bench-slot,.bench-slot-img{width:clamp(46px,12vw,62px)}}
 
 /* SELECTION PANEL (inner elements) */
 .sp-header{padding:1rem 1rem 0.6rem;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -244,7 +244,7 @@ input[type=text]::placeholder{color:var(--muted)}
 .sp-idle p{font-size:0.85rem}
 
 /* PICK CARD — image fills the entire card, no text overlay */
-.pick-card{background:var(--s2);border:1.5px solid var(--border);border-radius:11px;cursor:pointer;transition:all 0.18s;overflow:hidden;aspect-ratio:0.78;position:relative;width:100%;min-width:0;max-width:100%}
+.pick-card{background:var(--s2);border:1.5px solid var(--border);border-radius:11px;cursor:pointer;transition:all 0.18s;overflow:hidden;aspect-ratio:640/898;position:relative;width:100%;min-width:0;max-width:100%}
 .pick-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 4px 16px rgba(232,184,75,0.15)}
 .pick-card-img{width:100%;height:100%;max-width:100%;object-fit:cover;display:block;background:var(--s3)}
 
@@ -271,13 +271,13 @@ input[type=text]::placeholder{color:var(--muted)}
 .rst-card{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:0.7rem 1rem;text-align:center;min-width:80px}
 .rst-val{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold);line-height:1}
 .rst-lbl{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-top:2px}
-.result-pitches{display:flex;gap:1.8rem;width:100%;max-width:1040px;margin-bottom:2rem;flex-wrap:wrap;justify-content:center}
-.result-pitch-block{flex:1;min-width:320px;max-width:480px}
+.result-pitches{display:flex;gap:1.8rem;width:100%;max-width:1180px;margin-bottom:2rem;flex-wrap:wrap;justify-content:center}
+.result-pitch-block{flex:1;min-width:340px;max-width:560px}
 .rp-header{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:0.9rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);text-align:center;margin-bottom:10px}
 .result-pitch {
   position: relative;
   width: 100%;
-  aspect-ratio: 0.62; 
+  aspect-ratio: 1; 
   border-radius: 14px;
   overflow: hidden;
   display: flex;
@@ -302,12 +302,12 @@ input[type=text]::placeholder{color:var(--muted)}
 .rp-slot {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 16%;
+  width: 19%;
   z-index: 2;
 }
 .rp-slot img {
   width: 100%;
-  aspect-ratio: 0.78;
+  aspect-ratio: 640/898;
   object-fit: cover;
   border-radius: 6px;
   display: block;
@@ -328,8 +328,8 @@ input[type=text]::placeholder{color:var(--muted)}
 
 .result-bench-row img {
   width: 100%;
-  max-width: 46px;
-  aspect-ratio: 0.78;
+  max-width: 58px;
+  aspect-ratio: 640/898;
   object-fit: cover;
   border-radius: 4px;
   display: block;
@@ -1239,7 +1239,7 @@ function buildCourt(){
     div.id = 'starter_' + i;
     div.style.left = coord[0] + '%';
     div.style.top  = coord[1] + '%';
-    div.innerHTML = `<div class="starter-slot-img" id="starterImg_${i}"><span class="pos-text">${STARTER_POS[i]}</span></div><div class="starter-slot-label">${STARTER_POS[i]}</div>`;
+    div.innerHTML = `<div class="starter-slot-img" id="starterImg_${i}"><span class="pos-text">${STARTER_POS[i]}</span></div>`;
     div.onclick = ()=>openSlot('starter', i);
     starterContainer.appendChild(div);
   });
@@ -1359,6 +1359,7 @@ function pickPlayer(name){
   if(kind==='starter'){
     document.getElementById('starter_'+idx).className = 'starter-slot filled';
     document.getElementById('starterImg_'+idx).innerHTML = `<img src="${getImgUrl(player.img)}" alt="${player.name}" onerror="this.style.opacity='0.3'">`;
+    document.getElementById('starter_'+idx).insertAdjacentHTML('beforeend', `<div class="starter-slot-label">${STARTER_POS[idx]}</div>`);
   } else {
     document.getElementById('bench_'+idx).className = 'bench-slot filled';
     document.getElementById('benchImg_'+idx).innerHTML = `<img src="${getImgUrl(player.img)}" alt="${player.name}" onerror="this.style.opacity='0.3'">`;
