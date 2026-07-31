@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
 <title>All-Stars</title>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -701,42 +700,55 @@ const getImgUrl = (imgUrl) => {
 };
 
 // ═══════════════════════════════════════════════
-//  BACKEND SERVER (Socket.io — primary transport)
 // ═══════════════════════════════════════════════
-const SERVER_URL = "https://your-backend-server.onrender.com";
+//  MULTIPLAYER BACKEND
+//  Base44 is used ONLY as a headless matchmaking database (the same
+//  GameRooms table/app that Apex XI uses — GAME_ID keeps room codes
+//  from colliding between games): each room stores a 4-digit code
+//  plus each player's PeerJS peer ID. Once the guest reads the host's
+//  peer ID from Base44 and opens a direct PeerJS/WebRTC data
+//  connection, Base44 is not touched again for that room — every
+//  gameplay message (pool mode, draft progress, results) flows
+//  peer-to-peer from then on.
+// ═══════════════════════════════════════════════
 const GAME_ID = "allstars";
+const BASE44_APP_ID = "6a6a39f45047f242897fc81a";
+let base44 = null;
+(async () => {
+  try {
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@base44/sdk/+esm');
+    base44 = createClient({ appId: BASE44_APP_ID });
+  } catch (err) {
+    console.error('Base44 SDK failed to load — multiplayer matchmaking is unavailable.', err);
+  }
+})();
 
-// ═══════════════════════════════════════════════
-//  PEER-TO-PEER FALLBACK (PeerJS / WebRTC)
-//  If the Socket.io server can't be reached (or errors out) within
-//  FALLBACK_TIMEOUT_MS of attempting to host/join, we automatically
-//  switch to a direct peer-to-peer connection instead. Room codes
-//  double as the PeerJS peer ID (namespaced by GAME_ID), so the same
-//  4-digit code works for either transport without the player having
-//  to know or care which one ends up being used.
-// ═══════════════════════════════════════════════
-const FALLBACK_TIMEOUT_MS = 7000;
-const PEER_ID_PREFIX = 'allstars-' + GAME_ID + '-';
-let peer = null;
-let peerConn = null;
-let usingPeer = false;
+function requireBase44(errEl){
+  if(base44) return true;
+  const msg = 'Multiplayer backend not configured — set BASE44_APP_ID.';
+  if(errEl) errEl.textContent = msg; else console.error(msg);
+  return false;
+}
 
-function getPeerId(code){ return PEER_ID_PREFIX + code; }
-
-function updateConnBadge(){
-  const el = document.getElementById('connBadge');
-  const active = document.querySelector('.screen.active');
-  if (active && active.id === 'homeScreen') { el.style.display = 'none'; return; }
-  if (!G.roomCode) { el.style.display = 'none'; return; }
-  el.style.display = 'block';
-  el.textContent = usingPeer ? 'P2P Direct' : 'Server';
-  el.classList.toggle('peer', usingPeer);
+// Turns any thrown error into a short, human-readable string for
+// on-screen display (some players won't have DevTools available).
+function describeError(err){
+  if (!err) return 'unknown error';
+  const status = err.status || (err.response && err.response.status);
+  const msg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+  return status ? '[' + status + '] ' + msg : msg;
 }
 
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
-let socket = null;
+let localPeer = null;      // this browser's PeerJS Peer instance
+let gameConn = null;       // the open PeerJS DataConnection to the opponent
+let activeRoomId = null;   // Base44 row id for the room this client is tied to
+let connectToken = 0;      // bumped by leaveRoom()/new attempts so a stale async
+                            // callback from an abandoned host/join attempt can tell
+                            // it's stale and no-op instead of clobbering current state
+
 let selectedMode = '';
 
 let G = {
@@ -749,86 +761,57 @@ let G = {
   connected:false
 };
 
-// ─── socket connection (created once, reused for the whole session) ───
-let connectAttempts = 0;
-let hasConnectedOnce = false;
-
-function ensureSocket(){
-  if(socket) return socket;
-  socket = io(SERVER_URL, {
-    transports: ['websocket','polling'],
-    reconnectionAttempts: Infinity,
-    reconnectionDelayMax: 5000,
-    timeout: 20000
-  });
-
-  socket.on('game_action', data => handleIncoming(data));
-  socket.on('opponent_left', () => handleDisconnect());
-
-  socket.on('connect', () => {
-    hasConnectedOnce = true;
-    connectAttempts = 0;
-    const active = document.querySelector('.screen.active');
-    if(active && active.id === 'lobbyScreen' && !G.connected && !usingPeer){
-      setLobbyStatus('waiting', 'Waiting for opponent to join...');
-    }
-    if(active && active.id === 'joinScreen' && !usingPeer){
-      const errEl = document.getElementById('joinError');
-      if(errEl && /Can't reach|Connecting/.test(errEl.textContent)) errEl.textContent = '';
-    }
-  });
-
-  socket.on('connect_error', () => {
-    connectAttempts++;
-    if (usingPeer) return; // already on the P2P path, ignore socket noise
-    const active = document.querySelector('.screen.active');
-    const stillWakingUp = connectAttempts <= 6;
-    const msg = stillWakingUp
-      ? 'Connecting to server… (can take up to a minute if it was asleep)'
-      : 'Server unreachable — will try direct P2P shortly...';
-    if(active && active.id === 'lobbyScreen') setLobbyStatus('waiting', msg);
-    if(active && active.id === 'joinScreen'){
-      document.getElementById('joinError').textContent = msg;
-    }
-  });
-
-  return socket;
+function updateConnBadge(){
+  const el = document.getElementById('connBadge');
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === 'homeScreen') { el.style.display = 'none'; return; }
+  if (!G.roomCode) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = G.connected ? 'Connected' : 'Connecting…';
+  el.classList.toggle('peer', G.connected);
 }
 
-ensureSocket();
-
-// ─── send helper: relays a game-state message via whichever transport is active ───
 function send(msg){
-  if (usingPeer) {
-    if (peerConn && peerConn.open) peerConn.send(msg);
-    return;
-  }
-  if(socket && socket.connected && G.roomCode){
-    socket.emit('game_action', { gameId:GAME_ID, roomCode:G.roomCode, data:msg });
+  if (gameConn && gameConn.open) {
+    gameConn.send(msg);
+  } else {
+    console.warn('send() called with no open connection', msg);
   }
 }
 
-// ─── screen helper ───
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const target = document.getElementById(id);
+  if(target) target.classList.add('active');
   updateConnBadge();
 }
 
-// ─── leave whatever room we're currently in (keeps the socket itself alive) ───
+// Wires the PeerJS data channel — used whether we're the host (accepting an
+// incoming connection) or the guest (the one that initiated it).
+function setupPeerListeners(){
+  gameConn.on('data', data => handleIncoming(data));
+  gameConn.on('close', () => handleDisconnect());
+  gameConn.on('error', err => console.error('Data connection error', err));
+}
+
+// Tears down the current room: closes the P2P connection, destroys the
+// local Peer, and (best-effort, fire-and-forget) marks the Base44 row
+// ended if we created one, so a stale room with a dead peer ID can't
+// be matched by a future joiner.
 function leaveRoom(){
-  if(socket && G.roomCode && !usingPeer){
-    try{ socket.emit('leave_room', { roomCode:G.roomCode }); }catch(e){}
+  connectToken++; // invalidate any in-flight async callbacks from this room attempt
+  if (gameConn) { try{ gameConn.close(); }catch(e){} gameConn = null; }
+  if (localPeer) { try{ localPeer.destroy(); }catch(e){} localPeer = null; }
+  if (activeRoomId && base44) {
+    base44.entities.GameRooms.update(activeRoomId, { status: 'ended' }).catch(()=>{});
   }
-  if (peerConn) { try{ peerConn.close(); }catch(e){} peerConn = null; }
-  if (peer) { try{ peer.destroy(); }catch(e){} peer = null; }
-  usingPeer = false;
+  activeRoomId = null;
   G.roomCode = '';
   G.connected = false;
   updateConnBadge();
 }
 
-// ─── central dispatcher for messages relayed from the other player (works for both transports) ───
+// Central dispatcher for every message the opponent sends over the data channel.
 function handleIncoming(data){
   switch(data.type){
     case 'JOIN':
@@ -839,6 +822,7 @@ function handleIncoming(data){
       G.connected = true;
       send({type:'HOST_INFO', name:G.username, poolMode:G.poolMode});
       checkLobbyReady();
+      updateConnBadge();
       break;
     case 'HOST_INFO':
       if(G.mode !== 'guest') return;
@@ -847,6 +831,7 @@ function handleIncoming(data){
       G.connected = true;
       resetJoinBtn();
       showGuestLobby();
+      updateConnBadge();
       break;
     case 'HOST_MODE_UPDATE':
       if(G.mode === 'guest'){ G.oppPoolMode = data.poolMode; updateJoinModeNote(); }
@@ -870,11 +855,11 @@ function handleIncoming(data){
       }
       break;
     case 'ROOM_CLOSED':
-      leaveRoom();
-      showScreen('homeScreen');
+      resetToHomeScreen();
       break;
   }
 }
+
 
 // ═══════════════════════════════════════════════
 //  QR CODE
@@ -930,6 +915,7 @@ function updateJoinModeNote(){
 }
 
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 //  HOST LOBBY
 // ═══════════════════════════════════════════════
 function goToLobby(){
@@ -943,55 +929,69 @@ function goToLobby(){
   document.getElementById('slotName1').textContent = 'Waiting...';
   document.getElementById('slot1').classList.remove('filled');
   document.getElementById('lobbyStartBtn').disabled = true;
-  setLobbyStatus('waiting', 'Waiting for opponent to join...');
+  document.getElementById('lobbyCode').textContent = '—';
+  setLobbyStatus('waiting', 'Creating room…');
 
   G.mode = 'host';
   showScreen('lobbyScreen');
-  ensureSocket();
-  attemptCreateRoom();
+  createRoom();
 }
 
-function attemptCreateRoom(){
-  G.roomCode = String(Math.floor(1000 + Math.random() * 9000));
-  document.getElementById('lobbyCode').textContent = G.roomCode;
-  updateConnBadge();
+async function createRoom(attempt = 1){
+  const myToken = ++connectToken;
+  if(!requireBase44()){ setLobbyStatus('waiting', 'Multiplayer backend not configured.'); return; }
 
-  let ackReceived = false;
-  socket.emit('create_room', { gameId:GAME_ID, roomCode:G.roomCode, name:G.username }, (res)=>{
-    ackReceived = true;
-    if(!res || !res.ok){
-      if(res && res.reason === 'taken'){ attemptCreateRoom(); return; }
-      startHostPeerFallback();
-      return;
+  const roomCode = String(Math.floor(1000 + Math.random() * 9000));
+  localPeer = new Peer();
+
+  localPeer.on('open', async (peerId) => {
+    if (myToken !== connectToken) return; // user backed out while we were connecting
+    try {
+      const newRoom = await base44.entities.GameRooms.create({
+        gameId: GAME_ID,
+        roomCode: roomCode,
+        hostName: G.username,
+        hostPeerId: peerId,
+        status: 'waiting'
+      });
+      if (myToken !== connectToken) return; // stale by the time the write finished
+
+      activeRoomId = newRoom.id;
+      G.roomCode = roomCode;
+      document.getElementById('lobbyCode').textContent = roomCode;
+      updateConnBadge();
+      setLobbyStatus('waiting', 'Waiting for opponent to join...');
+    } catch (err) {
+      console.error('Base44 room create error', err);
+      if (myToken !== connectToken) return;
+      if (attempt < 3) {
+        setLobbyStatus('waiting', 'Connection hiccup — retrying…');
+        setTimeout(()=>createRoom(attempt + 1), 1500);
+      } else {
+        setLobbyStatus('waiting', 'Could not create room: ' + describeError(err));
+      }
     }
   });
 
-  setTimeout(()=>{
-    if(!usingPeer && (!ackReceived || !hasConnectedOnce)){
-      startHostPeerFallback();
-    }
-  }, FALLBACK_TIMEOUT_MS);
-}
-
-function startHostPeerFallback(){
-  if(usingPeer) return;
-  usingPeer = true;
-  updateConnBadge();
-  setLobbyStatus('waiting', 'Server unreachable — switching to direct P2P...');
-
-  peer = new Peer(getPeerId(G.roomCode));
-  peer.on('open', ()=>{
-    setLobbyStatus('waiting', 'Waiting for opponent to join (P2P)...');
+  // Fires when the guest's Peer connects directly to us.
+  localPeer.on('connection', (conn) => {
+    if (myToken !== connectToken) { try{ conn.close(); }catch(e){} return; }
+    gameConn = conn;
+    setupPeerListeners();
+    // Lobby UI (slot fill, oppUsername, checkLobbyReady) updates once the
+    // guest's JOIN message arrives via handleIncoming, not here — the data
+    // channel opening doesn't yet tell us who they are.
   });
-  peer.on('connection', (conn)=>{
-    peerConn = conn;
-    conn.on('open', ()=>{ /* handshake completes via JOIN/HOST_INFO messages */ });
-    conn.on('data', (data)=> handleIncoming(data));
-    conn.on('close', ()=> handleDisconnect());
+
+  localPeer.on('disconnected', () => {
+    if (myToken !== connectToken) return;
+    localPeer.reconnect();
   });
-  peer.on('error', (err)=>{
+
+  localPeer.on('error', (err) => {
     console.error('PeerJS host error', err);
-    setLobbyStatus('waiting', 'P2P connection failed — try creating a new room.');
+    if (myToken !== connectToken) return;
+    setLobbyStatus('waiting', 'Connection error: ' + describeError(err));
   });
 }
 
@@ -1000,13 +1000,12 @@ function checkLobbyReady(){
   const modePicked = G.poolMode !== '';
   const canStart   = guestIn && modePicked;
   document.getElementById('lobbyStartBtn').disabled = !canStart;
-  updateConnBadge();
 
   if(canStart){
     setLobbyStatus('ready', 'Both players ready — start the draft!');
   } else if(guestIn && !modePicked){
     setLobbyStatus('waiting', G.oppUsername + ' joined! Choose Current or All-Time to continue.');
-  } else if (!usingPeer) {
+  } else {
     setLobbyStatus('waiting', 'Waiting for opponent to join...');
   }
 }
@@ -1032,97 +1031,104 @@ function checkJoinReady(){
   document.getElementById('joinBtn').disabled = code.length !== 4;
 }
 
-function joinRoom(){
+async function joinRoom(){
   const code = document.getElementById('joinCodeInput').value.trim();
   const errEl = document.getElementById('joinError');
   errEl.textContent = '';
   if(code.length !== 4){ errEl.textContent = 'Enter a 4-digit code.'; return; }
+  if(!requireBase44(errEl)) return;
 
   document.getElementById('joinBtn').disabled = true;
   document.getElementById('joinBtn').textContent = 'CONNECTING...';
 
   leaveRoom();
+  const myToken = connectToken; // leaveRoom() just bumped it — capture the new value
   G.mode = 'guest';
 
-  ensureSocket();
-
-  let ackReceived = false;
-  socket.emit('join_room', { gameId:GAME_ID, roomCode:code, name:G.username }, (res)=>{
-    ackReceived = true;
-    if(usingPeer) return;
-    if(!res || !res.ok){
-      if(!hasConnectedOnce) return;
-      const reason = res && res.reason;
-      errEl.textContent = reason === 'not_found'
-        ? 'Room not found. Check the code and try again.'
-        : reason === 'full'
-        ? 'That room is already full.'
-        : 'Could not connect. Try again.';
+  let room;
+  try {
+    const rooms = await base44.entities.GameRooms.filter(
+      { gameId: GAME_ID, roomCode: code, status: 'waiting' },
+      '-created_date', 1
+    );
+    if (myToken !== connectToken) return; // user backed out mid-lookup
+    if (!rooms.length) {
+      errEl.textContent = 'Room not found. Check the code and try again.';
       resetJoinBtn();
       return;
     }
-    G.roomCode = code;
-    updateConnBadge();
-    send({type:'JOIN', name:G.username});
-  });
-
-  setTimeout(()=>{
-    if(!usingPeer && (!ackReceived || !hasConnectedOnce)){
-      startGuestPeerFallback(code);
-    }
-  }, FALLBACK_TIMEOUT_MS);
-}
-
-function startGuestPeerFallback(code){
-  if(usingPeer) return;
-  usingPeer = true;
-  G.roomCode = code;
-  updateConnBadge();
-  const errEl = document.getElementById('joinError');
-  errEl.textContent = 'Server unreachable — trying direct P2P connection...';
-
-  peer = new Peer();
-  peer.on('open', ()=>{
-    connectToHostPeer(code, 0);
-  });
-  peer.on('error', (err)=>{
-    console.error('PeerJS guest error', err);
-  });
-}
-
-function connectToHostPeer(code, attempt){
-  const conn = peer.connect(getPeerId(code));
-  let settled = false;
-
-  conn.on('open', ()=>{
-    settled = true;
-    peerConn = conn;
-    G.connected = true;
-    G.roomCode = code;
-    resetJoinBtn();
-    document.getElementById('joinError').textContent = '';
-    send({type:'JOIN', name:G.username});
-  });
-  conn.on('data', data=>handleIncoming(data));
-  conn.on('close', ()=>handleDisconnect());
-  conn.on('error', ()=>{
-    if(settled) return;
-    retryHostPeerConnect(code, attempt);
-  });
-
-  setTimeout(()=>{
-    if(!settled) retryHostPeerConnect(code, attempt);
-  }, 4000);
-}
-
-function retryHostPeerConnect(code, attempt){
-  if (peerConn) return;
-  if(attempt >= 6){
-    document.getElementById('joinError').textContent = 'Could not reach host — check the code and that both players are online.';
+    room = rooms[0];
+    activeRoomId = room.id;
+  } catch (err) {
+    console.error('Base44 room lookup error', err);
+    if (myToken !== connectToken) return;
+    errEl.textContent = 'Could not reach matchmaking server: ' + describeError(err);
     resetJoinBtn();
     return;
   }
-  setTimeout(()=>connectToHostPeer(code, attempt+1), 2500);
+
+  localPeer = new Peer();
+
+  localPeer.on('error', (err) => {
+    console.error('PeerJS guest error', err);
+    if (myToken !== connectToken) return;
+    errEl.textContent = 'Connection error: ' + describeError(err);
+    resetJoinBtn();
+  });
+
+  localPeer.on('disconnected', () => {
+    if (myToken !== connectToken) return;
+    localPeer.reconnect();
+  });
+
+  localPeer.on('open', () => {
+    if (myToken !== connectToken) return;
+    connectToHost(room.hostPeerId, code, myToken, 1);
+  });
+}
+
+function connectToHost(hostPeerId, code, myToken, attempt){
+  const errEl = document.getElementById('joinError');
+  const conn = localPeer.connect(hostPeerId, { reliable: true });
+  let settled = false;
+
+  const timeout = setTimeout(() => {
+    if (settled || myToken !== connectToken) return;
+    try{ conn.close(); }catch(e){}
+    if (attempt < 3) {
+      errEl.textContent = 'Still trying to reach the host… (' + (attempt+1) + '/3)';
+      connectToHost(hostPeerId, code, myToken, attempt + 1);
+    } else {
+      errEl.textContent = 'Could not reach host — check the code and that both players are online.';
+      resetJoinBtn();
+    }
+  }, 6000);
+
+  conn.on('open', () => {
+    settled = true;
+    clearTimeout(timeout);
+    if (myToken !== connectToken) { try{ conn.close(); }catch(e){} return; }
+    gameConn = conn;
+    setupPeerListeners();
+    G.roomCode = code;
+    G.connected = true;
+    updateConnBadge();
+    errEl.textContent = '';
+    send({type:'JOIN', name:G.username});
+    // Best-effort record-keeping — the P2P link is already live, so this
+    // doesn't gate anything and failures here are non-fatal.
+    if (activeRoomId && base44) {
+      base44.entities.GameRooms.update(activeRoomId, {
+        guestName: G.username, status: 'active'
+      }).catch(()=>{});
+    }
+  });
+
+  conn.on('error', (err) => {
+    console.error('Data connection error', err);
+    settled = true;
+    clearTimeout(timeout);
+  });
 }
 
 function resetJoinBtn(){
@@ -1158,6 +1164,14 @@ function leaveJoinScreen(){
 
 function goHome(){
   send({type:'ROOM_CLOSED'});
+  resetToHomeScreen();
+}
+
+// Shared by goHome() (leaving voluntarily) and the ROOM_CLOSED handler
+// (opponent left) so both paths reset the exact same state and UI —
+// previously ROOM_CLOSED skipped this, leaving stale inline styles
+// (hidden pool-mode row/start button) for the next lobby visit.
+function resetToHomeScreen(){
   leaveRoom();
   selectedMode = '';
   G = {username:G.username, mode:'', roomCode:'', poolMode:'', oppUsername:'', oppPoolMode:'',
@@ -1169,7 +1183,7 @@ function goHome(){
   document.getElementById('homeNextBtn').disabled = true;
   document.getElementById('homeError').textContent = '';
   document.getElementById('lobbyStartBtn').style.display = '';
-  document.getElementById('lobbyModeRow').style.display = 'flex';
+  document.getElementById('lobbyModeRow').style.display = '';
   document.getElementById('lobbyModeHeading').style.display = '';
   showScreen('homeScreen');
 }
